@@ -32,7 +32,7 @@ SPEAKERS_DIR = 1
 AUDIO_DUR = 'MP3'
 PLAYLIST_FILE_EXT = 'm3u'
 
-LDS_ORG_URL = 'https://www.lds.org'
+LDS_ORG_URL = 'https://www.churchofjesuschrist.org'
 ALL_CONFERENCES_URL = f'{LDS_ORG_URL}/general-conference/conferences'
 
 GET_SESSION_TITLE_REGEX = '<span class=\"section__header__title\">(.*?)</span>'
