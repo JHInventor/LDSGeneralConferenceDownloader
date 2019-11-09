@@ -36,7 +36,8 @@ LDS_ORG_URL = 'https://www.churchofjesuschrist.org'
 ALL_CONFERENCES_URL = f'{LDS_ORG_URL}/general-conference/conferences'
 
 GET_SESSION_TITLE_REGEX = '<span class=\"section__header__title\">(.*?)</span>'
-TALK_LINK_REGEX = '<source src=\"(.*?.mp3)\">'
+TALK_LINK_REGEX1 = '<\/header><a href=\"(.*?.mp3?.*)\" title=\"This Page \(MP3\)\"'
+TALK_LINK_REGEX2 = '<source src=\"(.*?.mp3)\">'
 TALK_TOPIC_REGEX = '<div class=\"drawerList tab\" data-title=\"(.*?)\">'
 GET_TALK_LINKS_FROM_SESSION_SECTION_REGEX = '<div class=\"lumen-tile lumen-tile--horizontal lumen-tile--list\">.*?' \
                                             '<a href=\"(.*?)\" class=\"lumen-tile__link\">.*?<div ' \
@@ -109,8 +110,11 @@ def get_session(args, playlist_dirs, session):
 def get_talk(args, playlist_dirs, talk):
     talk_html = get(args, f'{LDS_ORG_URL}{talk.link}')
 
-    mp3_link_result = re.findall(TALK_LINK_REGEX, talk_html)
+    mp3_link_result = re.findall(TALK_LINK_REGEX1, talk_html)
     if not mp3_link_result:
+        mp3_link_result = re.findall(TALK_LINK_REGEX2, talk_html)
+    if not mp3_link_result:
+        print("Unable to determine MP3 link")
         return
     link_mp3 = mp3_link_result[0]
 
