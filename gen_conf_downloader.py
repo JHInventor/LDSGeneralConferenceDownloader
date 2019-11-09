@@ -17,8 +17,8 @@ from mutagen.mp3 import MP3
 from tqdm import tqdm
 
 Season = namedtuple('Season', 'link year month title')
-Session = namedtuple('Session', 'html title season')
-Talk = namedtuple('Talk', 'link speaker title session')
+Session = namedtuple('Session', 'html title number season')
+Talk = namedtuple('Talk', 'link speaker title number session')
 
 speakers_num = defaultdict(int)
 topics_num = defaultdict(int)
@@ -84,10 +84,12 @@ def get_conference_season(args, playlist_dirs, season):
     session_htmls = season_html.split(SESSION_SPLITTER)
 
     sessions = list()
+    session_number = 10
     for session_html in session_htmls:
         session_title_results = re.findall(GET_SESSION_TITLE_REGEX, session_html)
         if session_title_results:
-            sessions.append(Session(session_html, session_title_results[0], season))
+            sessions.append(Session(session_html, str(session_number) + "-" + session_title_results[0], session_number, season))
+            session_number += 10
 
     with tqdm(total=len(sessions)) as progress_bar:
         for session in sessions:
@@ -98,7 +100,7 @@ def get_conference_season(args, playlist_dirs, season):
 
 def get_session(args, playlist_dirs, session):
     talk_summaries = get_talk_summary_details(session.html)
-    talks = [Talk(decode(talk[0]), talk[2], get_filename_from_talk_title(talk[1]), session) for talk in talk_summaries]
+    talks = [Talk(decode(talk[0]), talk[2], get_filename_from_talk_title(talk[1]), session.number + num, session) for num, talk in enumerate(talk_summaries, start=1)]
 
     with tqdm(total=len(talks)) as progress_bar:
         for talk in talks:
@@ -122,7 +124,7 @@ def get_talk(args, playlist_dirs, talk):
     topics = [to_camel_case(topic) for topic in topics]
 
     filename_mp3 = f'{AUDIO_DUR}/{talk.session.season.year}/{talk.session.season.month}/{talk.session.title}/' \
-                   f'{talk.title} ({talk.speaker}).mp3'
+                   f'{talk.number} {talk.title} ({talk.speaker}).mp3'
     output_mp3_filepath = get_mp3(args, link_mp3, filename_mp3)
     duration = int(MP3(output_mp3_filepath).info.length)
 
