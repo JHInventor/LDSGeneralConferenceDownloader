@@ -293,7 +293,7 @@ def get_from_cache(args, url):
     path = get_cache_filename(args, url)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     if os.path.isfile(path):
-        with open(path, 'r') as f:
+        with open(path, 'r', encoding="utf-8") as f:
             return f.read()
     return None
 
@@ -303,7 +303,7 @@ def add_to_cache(args, html, url):
     url = quote_plus(url)
     path = get_cache_filename(args, url)
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w') as f:
+    with open(path, 'w', encoding="utf-8") as f:
         f.write(html)
 
 
