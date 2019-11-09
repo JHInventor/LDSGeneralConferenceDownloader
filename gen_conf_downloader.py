@@ -98,7 +98,7 @@ def get_conference_season(args, playlist_dirs, season):
 
 def get_session(args, playlist_dirs, session):
     talk_summaries = get_talk_summary_details(session.html)
-    talks = [Talk(decode(talk[0]), talk[2], talk[1], session) for talk in talk_summaries]
+    talks = [Talk(decode(talk[0]), talk[2], get_filename_from_talk_title(talk[1]), session) for talk in talk_summaries]
 
     with tqdm(total=len(talks)) as progress_bar:
         for talk in talks:
@@ -129,6 +129,9 @@ def get_talk(args, playlist_dirs, talk):
     update_playlists(args, playlist_dirs, talk, filename_mp3, topics, duration)
     increment_counts(talk.speaker, topics, duration)
 
+def get_filename_from_talk_title(talk_title):
+    keepcharacters = (' ','.','_')
+    return "".join(c for c in talk_title if c.isalnum() or c in keepcharacters).rstrip()
 
 def get_mp3_filepath(year, month_text, session_lable_text, title_text, name_text):
     return f'mp3/{year}/{month_text}/{session_lable_text}/' \
