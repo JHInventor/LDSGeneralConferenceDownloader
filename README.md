@@ -37,6 +37,7 @@ Load these files onto a *memory stick* for your car, or into your *favourite med
 |`-d` or `-dest`|folder relative to here. i.e. `./conference`|Destination folder to output files to. Defaults to `output`|
 |`-n` or `-nocleanup`| |Leaves temporary files after process completion.|
 |`-v` or `-verbose`| |Provides detailed activity logging instead of progress bars.|
+|`-nonumbers`| |Excludes generated session and talk numbers from file and directory names.|
 
  _Note: Depending upon how many years worth of conferences you ask it to download, it may take some time!_
 
