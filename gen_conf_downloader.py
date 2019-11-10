@@ -389,7 +389,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Download language specific LDS General Conference MP3s, '
                                                  'creating playlists for each conference, speaker and topic.')
     parser.add_argument('-lang', help='Language version to download. '
-                                      'See https://www.lds.org/languages for full list.', default='eng')
+                                      'See https://www.churchofjesuschrist.org/languages for full list.', default='eng')
     parser.add_argument('-start', type=int, help='First year to download. '
                                                  'Note: not all historic sessions are available in all languages',
                         default=1971)
