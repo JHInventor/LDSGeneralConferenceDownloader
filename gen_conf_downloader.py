@@ -88,7 +88,7 @@ def get_conference_season(args, playlist_dirs, season):
     for session_html in session_htmls:
         session_title_results = re.findall(GET_SESSION_TITLE_REGEX, session_html)
         if session_title_results:
-            sessions.append(Session(session_html, str(session_number) + "-" + session_title_results[0], session_number, season))
+            sessions.append(Session(session_html, session_title_results[0], session_number, season))
             session_number += 10
 
     with tqdm(total=len(sessions)) as progress_bar:
@@ -123,8 +123,12 @@ def get_talk(args, playlist_dirs, talk):
     topics = re.findall(TALK_TOPIC_REGEX, talk_html)
     topics = [to_camel_case(topic) for topic in topics]
 
-    filename_mp3 = f'{AUDIO_DUR}/{talk.session.season.year}/{talk.session.season.month}/{talk.session.title}/' \
-                   f'{talk.number} {talk.title} ({talk.speaker}).mp3'
+    if args.nonumbers:
+        filename_mp3 = f'{AUDIO_DUR}/{talk.session.season.year}/{talk.session.season.month}/{talk.session.title}/' \
+                       f'{talk.title} ({talk.speaker}).mp3'
+    else:
+        filename_mp3 = f'{AUDIO_DUR}/{talk.session.season.year}/{talk.session.season.month}/{talk.session.number}-{talk.session.title}/' \
+                       f'{talk.number} {talk.title} ({talk.speaker}).mp3'
     output_mp3_filepath = get_mp3(args, link_mp3, filename_mp3)
     duration = int(MP3(output_mp3_filepath).info.length)
 
@@ -398,6 +402,7 @@ if __name__ == '__main__':
     parser.add_argument('-nocleanup', help='Leaves temporary files after process completion.', action="store_true")
     parser.add_argument('-verbose', help='Provides detailed activity logging instead of progress bars.',
                         action="store_true")
+    parser.add_argument('-nonumbers', help='Excludes generated session and talk numbers from file and directory names.', action="store_true")
 
     cli_args = parser.parse_args()
 
