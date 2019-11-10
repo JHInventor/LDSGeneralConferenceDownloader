@@ -36,7 +36,7 @@ LDS_ORG_URL = 'https://www.churchofjesuschrist.org'
 ALL_CONFERENCES_URL = f'{LDS_ORG_URL}/general-conference/conferences'
 
 GET_SESSION_TITLE_REGEX = '<span class=\"section__header__title\">(.*?)</span>'
-TALK_LINK_REGEX1 = '<\/header><a href=\"(.*?.mp3?.*)\" title=\"This Page \(MP3\)\"'
+TALK_LINK_REGEX1 = '<a href=\"([^"]*.mp3.*)\" title=\"This Page \(MP3\)\"'
 TALK_LINK_REGEX2 = '<source src=\"(.*?.mp3)\">'
 TALK_TOPIC_REGEX = '<div class=\"drawerList tab\" data-title=\"(.*?)\">'
 GET_TALK_LINKS_FROM_SESSION_SECTION_REGEX = '<div class=\"lumen-tile lumen-tile--horizontal lumen-tile--list\">.*?' \
