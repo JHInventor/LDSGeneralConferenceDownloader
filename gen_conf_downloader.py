@@ -17,8 +17,8 @@ from mutagen.mp3 import MP3
 from tqdm import tqdm
 
 Season = namedtuple('Season', 'link year month title')
-Session = namedtuple('Session', 'html title season')
-Talk = namedtuple('Talk', 'link speaker title session')
+Session = namedtuple('Session', 'html title number season')
+Talk = namedtuple('Talk', 'link speaker title number session')
 
 speakers_num = defaultdict(int)
 topics_num = defaultdict(int)
@@ -32,11 +32,12 @@ SPEAKERS_DIR = 1
 AUDIO_DUR = 'MP3'
 PLAYLIST_FILE_EXT = 'm3u'
 
-LDS_ORG_URL = 'https://www.lds.org'
+LDS_ORG_URL = 'https://www.churchofjesuschrist.org'
 ALL_CONFERENCES_URL = f'{LDS_ORG_URL}/general-conference/conferences'
 
 GET_SESSION_TITLE_REGEX = '<span class=\"section__header__title\">(.*?)</span>'
-TALK_LINK_REGEX = '<source src=\"(.*?.mp3)\">'
+TALK_LINK_REGEX1 = '<a href=\"([^"]*.mp3.*)\" title=\"This Page \(MP3\)\"'
+TALK_LINK_REGEX2 = '<source src=\"(.*?.mp3)\">'
 TALK_TOPIC_REGEX = '<div class=\"drawerList tab\" data-title=\"(.*?)\">'
 GET_TALK_LINKS_FROM_SESSION_SECTION_REGEX = '<div class=\"lumen-tile lumen-tile--horizontal lumen-tile--list\">.*?' \
                                             '<a href=\"(.*?)\" class=\"lumen-tile__link\">.*?<div ' \
@@ -83,10 +84,12 @@ def get_conference_season(args, playlist_dirs, season):
     session_htmls = season_html.split(SESSION_SPLITTER)
 
     sessions = list()
+    session_number = 10
     for session_html in session_htmls:
         session_title_results = re.findall(GET_SESSION_TITLE_REGEX, session_html)
         if session_title_results:
-            sessions.append(Session(session_html, session_title_results[0], season))
+            sessions.append(Session(session_html, session_title_results[0], session_number, season))
+            session_number += 10
 
     with tqdm(total=len(sessions)) as progress_bar:
         for session in sessions:
@@ -97,7 +100,7 @@ def get_conference_season(args, playlist_dirs, season):
 
 def get_session(args, playlist_dirs, session):
     talk_summaries = get_talk_summary_details(session.html)
-    talks = [Talk(decode(talk[0]), talk[2], talk[1], session) for talk in talk_summaries]
+    talks = [Talk(decode(talk[0]), talk[2], get_filename_from_talk_title(talk[1]), session.number + num, session) for num, talk in enumerate(talk_summaries, start=1)]
 
     with tqdm(total=len(talks)) as progress_bar:
         for talk in talks:
@@ -109,22 +112,32 @@ def get_session(args, playlist_dirs, session):
 def get_talk(args, playlist_dirs, talk):
     talk_html = get(args, f'{LDS_ORG_URL}{talk.link}')
 
-    mp3_link_result = re.findall(TALK_LINK_REGEX, talk_html)
+    mp3_link_result = re.findall(TALK_LINK_REGEX1, talk_html)
     if not mp3_link_result:
+        mp3_link_result = re.findall(TALK_LINK_REGEX2, talk_html)
+    if not mp3_link_result:
+        print("Unable to determine MP3 link")
         return
     link_mp3 = mp3_link_result[0]
 
     topics = re.findall(TALK_TOPIC_REGEX, talk_html)
     topics = [to_camel_case(topic) for topic in topics]
 
-    filename_mp3 = f'{AUDIO_DUR}/{talk.session.season.year}/{talk.session.season.month}/{talk.session.title}/' \
-                   f'{talk.title} ({talk.speaker}).mp3'
+    if args.nonumbers:
+        filename_mp3 = f'{AUDIO_DUR}/{talk.session.season.year}/{talk.session.season.month}/{talk.session.title}/' \
+                       f'{talk.title} ({talk.speaker}).mp3'
+    else:
+        filename_mp3 = f'{AUDIO_DUR}/{talk.session.season.year}/{talk.session.season.month}/{talk.session.number}-{talk.session.title}/' \
+                       f'{talk.number} {talk.title} ({talk.speaker}).mp3'
     output_mp3_filepath = get_mp3(args, link_mp3, filename_mp3)
     duration = int(MP3(output_mp3_filepath).info.length)
 
     update_playlists(args, playlist_dirs, talk, filename_mp3, topics, duration)
     increment_counts(talk.speaker, topics, duration)
 
+def get_filename_from_talk_title(talk_title):
+    keepcharacters = (' ','.','_')
+    return "".join(c for c in talk_title if c.isalnum() or c in keepcharacters).rstrip()
 
 def get_mp3_filepath(year, month_text, session_lable_text, title_text, name_text):
     return f'mp3/{year}/{month_text}/{session_lable_text}/' \
@@ -293,7 +306,7 @@ def get_from_cache(args, url):
     path = get_cache_filename(args, url)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     if os.path.isfile(path):
-        with open(path, 'r') as f:
+        with open(path, 'r', encoding="utf-8") as f:
             return f.read()
     return None
 
@@ -303,7 +316,7 @@ def add_to_cache(args, html, url):
     url = quote_plus(url)
     path = get_cache_filename(args, url)
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w') as f:
+    with open(path, 'w', encoding="utf-8") as f:
         f.write(html)
 
 
@@ -380,7 +393,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Download language specific LDS General Conference MP3s, '
                                                  'creating playlists for each conference, speaker and topic.')
     parser.add_argument('-lang', help='Language version to download. '
-                                      'See https://www.lds.org/languages for full list.', default='eng')
+                                      'See https://www.churchofjesuschrist.org/languages for full list.', default='eng')
     parser.add_argument('-start', type=int, help='First year to download. '
                                                  'Note: not all historic sessions are available in all languages',
                         default=1971)
@@ -389,6 +402,7 @@ if __name__ == '__main__':
     parser.add_argument('-nocleanup', help='Leaves temporary files after process completion.', action="store_true")
     parser.add_argument('-verbose', help='Provides detailed activity logging instead of progress bars.',
                         action="store_true")
+    parser.add_argument('-nonumbers', help='Excludes generated session and talk numbers from file and directory names.', action="store_true")
 
     cli_args = parser.parse_args()
 
