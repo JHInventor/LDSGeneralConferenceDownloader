@@ -3,11 +3,13 @@ Script to download LDS General Conference MP3s, creating playlists for each conf
 """
 
 import html as html_tools
+import io
 import json
 import os
 import re
 import shutil
 import sys
+from html.parser import HTMLParser
 from urllib.parse import unquote_plus
 from urllib.parse import quote_plus
 import urllib.request
@@ -36,8 +38,7 @@ LDS_ORG_URL = 'https://www.churchofjesuschrist.org'
 ALL_CONFERENCES_URL = f'{LDS_ORG_URL}/general-conference/conferences'
 
 GET_SESSION_TITLE_REGEX = '<span class=\"section__header__title\">(.*?)</span>'
-TALK_LINK_REGEX1 = '<a href=\"([^"]*.mp3.*)\" title=\"This Page \(MP3\)\"'
-TALK_LINK_REGEX2 = '<source src=\"(.*?.mp3)\">'
+TALK_LINK_REGEX = '<a href=\"([^"]*.mp3.*)\" .*This Page \(MP3\)'
 TALK_TOPIC_REGEX = '<div class=\"drawerList tab\" data-title=\"(.*?)\">'
 GET_TALK_LINKS_FROM_SESSION_SECTION_REGEX = '<div class=\"lumen-tile lumen-tile--horizontal lumen-tile--list\">.*?' \
                                             '<a href=\"(.*?)\" class=\"lumen-tile__link\">.*?<div ' \
@@ -50,6 +51,19 @@ GET_SECTION_TERMS_REGEX = '<a class=\"link trigger trigger.*?\" data-target-watc
                           '(.*?)<span'
 
 SESSION_SPLITTER = 'section tile-wrapper layout--3 lumen-layout__item'
+
+
+class MLStripper(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.reset()
+        self.strict = False
+        self.convert_charrefs = True
+        self.text = io.StringIO()
+    def handle_data(self, d):
+        self.text.write(d)
+    def get_data(self):
+        return self.text.getvalue()
 
 
 def get_all_conferences_seasons(args):
@@ -88,7 +102,7 @@ def get_conference_season(args, playlist_dirs, season):
     for session_html in session_htmls:
         session_title_results = re.findall(GET_SESSION_TITLE_REGEX, session_html)
         if session_title_results:
-            sessions.append(Session(session_html, session_title_results[0], session_number, season))
+            sessions.append(Session(session_html, clean_session_title(session_title_results[0]), session_number, season))
             session_number += 10
 
     with tqdm(total=len(sessions)) as progress_bar:
@@ -112,11 +126,9 @@ def get_session(args, playlist_dirs, session):
 def get_talk(args, playlist_dirs, talk):
     talk_html = get(args, f'{LDS_ORG_URL}{talk.link}')
 
-    mp3_link_result = re.findall(TALK_LINK_REGEX1, talk_html)
+    mp3_link_result = re.findall(TALK_LINK_REGEX, talk_html)
     if not mp3_link_result:
-        mp3_link_result = re.findall(TALK_LINK_REGEX2, talk_html)
-    if not mp3_link_result:
-        print("Unable to determine MP3 link")
+        print("Unable to determine MP3 link for {} at '{}'".format(talk.session.title, talk.link))
         return
     link_mp3 = mp3_link_result[0]
 
@@ -135,9 +147,18 @@ def get_talk(args, playlist_dirs, talk):
     update_playlists(args, playlist_dirs, talk, filename_mp3, topics, duration)
     increment_counts(talk.speaker, topics, duration)
 
+
+def clean_session_title(session_title):
+    s = MLStripper()
+    s.feed(session_title)
+    keepcharacters = (' ')
+    return "".join(c for c in s.get_data() if c.isalnum() or c in keepcharacters).rstrip()
+
+
 def get_filename_from_talk_title(talk_title):
     keepcharacters = (' ','.','_')
     return "".join(c for c in talk_title if c.isalnum() or c in keepcharacters).rstrip()
+
 
 def get_mp3_filepath(year, month_text, session_lable_text, title_text, name_text):
     return f'mp3/{year}/{month_text}/{session_lable_text}/' \
