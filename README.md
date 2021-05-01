@@ -10,7 +10,7 @@ This script is ideal for:
 ## What it can do?
 This script will allow you to download the LDS General Conference talks in mp3 form that are available at https://www.churchofjesuschrist.org/general-conference.
 It will create *playlists* as *.m3u files to allow you to play an *entire session*. 
-It will also create playlists for *speakers* and *topcs*.
+It will also create playlists for *speakers* and *topics*.
 This will not only work with the default English versions, but also for *every other language* for which audio files are available.
 Currently, hundreds of talks are available in many languages, going back as far as 1971 for some.
 
@@ -33,11 +33,14 @@ Load these files onto a *memory stick* for your car, or into your *favourite med
 |`-h` or `--help`| |List all arguments and exit|
 |`-l` or `-lang`| 3-letter language code|Indicates which language version is to be downloaded. See https://www.churchofjesuschrist.org/languages for full list. Click on the language you want, then take note of the 3-letter code in the address bar. i.e. https://www.churchofjesuschrist.org/?lang=*spa*|
 |`-s` or `-start`|Year as 4 digit number|First year of conference to download. Defaults to 1971. _Note: not all historic sessions are available in all languages_|
-|`-e` or `-end`|Year as 4 digit number|Last year to download (defaults to 2100).|
+|`-e` or `-end`|Year as 4 digit number|Last year to download (defaults to current year).|
 |`-d` or `-dest`|folder relative to here. i.e. `./conference`|Destination folder to output files to. Defaults to `output`|
 |`-n` or `-nocleanup`| |Leaves temporary files after process completion.|
 |`-v` or `-verbose`| |Provides detailed activity logging instead of progress bars.|
-|`-nonumbers`| |Excludes generated session and talk numbers from file and directory names.|
+|`-nonumbers`| |Skips adding numbers to session directory names.|
+|`-noplaylists`| |Skips creating m3u playlist files.|
+|`-speaker-min`| |Minimum number of talks to create a speaker playlist file.|
+|`-nogui`| |Use command line only to show progress.|
 
  _Note: Depending upon how many years worth of conferences you ask it to download, it may take some time!_
 
@@ -45,21 +48,16 @@ Load these files onto a *memory stick* for your car, or into your *favourite med
 It will generate a folder structure as follows in your destination folder:
 ```
 output
-└───eng
+└───General Conference (eng)
     └───Conferences
-    │   └───2018
-    │   │   └───4
-    │   │   │   10-Saturday Morning Session.m3u
-    │   │   │   20-Saturday Afternoon Session.m3u
-    │   │   │   30-Priesthood Session.m3u
-    │   │   │   ...
-    │   │   └───10
-    │   │       ...
-    │   └───2017
-    │       ...
+    │   2021-(87, 7h44m).m3u
+    │   2021-April-(87, 7h44m).m3u
+    │   2021-April-Saturday Morning Session-(87, 7h44m).m3u
+    │   2021-April-Saturday Afternoon Session-(87, 7h44m).m3u
+    │   ...
     └───MP3
-    │   └───2018
-    │   │   └───4
+    │   └───2021
+    │   │   └───April
     │   │   │   └───10-Saturday Morning Session
     │   │   │   │   ...
     │   │   │   └───20-Saturday Afternoon Session
@@ -68,16 +66,16 @@ output
     │   │   │   │   31 Am I a Child of God? (Brian K. Taylor).mp3
     │   │   │   │   32 Even as Christ Forgives You, So Also Do Ye (Larry J. Echo Hawk).mp3
     │   │   │   │   ...
-    │   │   └───10
+    │   │   └───October
     │   └───2017
     │       ...
     └───Speakers
-    │   D. Todd Christofferson(1, 13m).m3u
-    |   Dallin H. Oaks(3, 45m).m3u
-    |   ...
+    │   D. Todd Christofferson-(2021-2010, 1, 13m).m3u
+    │   Dallin H. Oaks(2021-2000, 3, 45m).m3u
+    │   ...
     └───Topics
-        Adversity(3, 44m).m3u
-        Atonement(6, 1h4m).m3u
+        Adversity-(3, 44m).m3u
+        Atonement-(6, 1h4m).m3u
         ...
 ```        
-The playlists for the Topics and Speakers include in parenthesis the number of talks and the total duration.
+The playlists for the Topics and Speakers include in parenthesis the number of talks and the total duration and talk min/max year range for speakers.
