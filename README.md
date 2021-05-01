@@ -44,6 +44,14 @@ Load these files onto a *memory stick* for your car, or into your *favourite med
 
  _Note: Depending upon how many years worth of conferences you ask it to download, it may take some time!_
 
+## How do I create an executable to share with family and friends?
+1. Follow steps 1 and 2 under "What do I need to do to run this script?"
+2. Install pyinstaller
+`pip install pyinstaller`
+3. Create executable using pyinstaller (WINDOWS)
+`pyinstaller -F -n GeneralConferenceDownloader --add-data="conference_headers.json;." gen_conf_downloader.py`
+4. Share dist/GeneralConferenceDownloader.exe with your family and friends
+
 ## What does it generate?
 It will generate a folder structure as follows in your destination folder:
 ```

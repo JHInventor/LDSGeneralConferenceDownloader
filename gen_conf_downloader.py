@@ -134,7 +134,7 @@ class MLStripper(HTMLParser):
 
 
 def add_headers(request):
-    with open('conference_headers.json', 'r') as f:
+    with open(get_resource_path('conference_headers.json'), 'r') as f:
         headers = json.load(f)
 
     for key in headers:
@@ -389,6 +389,13 @@ def get_html(args, url, nocache=False):
         return ''
 
 
+def get_month_path(args, conference):
+    if 4 == conference.month:
+        return 'April'
+    else:
+        return 'October'
+
+
 def get_output_dir(args):
     return f'{args.dest}/GeneralConference ({args.lang})'
 
@@ -430,11 +437,14 @@ def get_relative_path(args, session):
     return f'MP3/{get_year_path(args, session.conference)}/{get_month_path(args, session.conference)}/{get_session_path(args, session)}'
 
 
-def get_month_path(args, conference):
-    if 4 == conference.month:
-        return 'April'
-    else:
-        return 'October'
+def get_resource_path(relative_path):
+    # Try to retrieve the PyInstaller resource path
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        # Default to current directory if not found
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 
 def get_session_path(args, session, nonumbers=False):
@@ -446,6 +456,54 @@ def get_session_path(args, session, nonumbers=False):
 
 def get_year_path(args, conference):
     return f'{conference.year}'
+
+
+def gui_get_settings(args):
+    lang_list = ["{} ({})".format(v, k) for k, v in args.lang_map.items()]
+    lang_list_idx = "{} ({})".format(args.lang_map[args.lang], args.lang)
+    year_list = range(1971, args.max_year+1)
+    has_cache = os.path.exists(f'{args.cache_home}/{args.lang}')
+    layout = [
+        [sg.Text('_'  * 150, size=(80, 1))],
+        [sg.Text('General Conference Selection', font=('Helvetica', 16))],
+        [sg.Text("Language:", size=(25, 1), justification="right"), sg.OptionMenu(values=lang_list, default_value=lang_list_idx, key='-LANG-', size=(50,1))],
+        [sg.Text("Starting year:", size=(25, 1), justification="right"), sg.OptionMenu(values=year_list, default_value=args.start, key='-START-', size=(50,1))],
+        [sg.Text("Ending year:", size=(25, 1), justification="right"), sg.OptionMenu(values=year_list, default_value=args.end, key='-END-', size=(50,1))],
+        [sg.Text('_'  * 150, size=(80, 1))],
+        [sg.Text('Downloader Output Settings', font=('Helvetica', 16))],
+        [sg.Text("Destination path:", size=(25, 1), justification="right"), sg.FolderBrowse(initial_folder=args.dest, target='-DEST-', size=(10,1)), sg.Text(args.dest, key='-DEST-', size=(40, 1))],
+        [sg.Text("Minimum talks for speaker playlist:", size=(25, 1), justification="right"), sg.OptionMenu(values=range(1,10), default_value=args.speaker_min, key='-SPEAKER-MIN-', size=(50,1))],
+        [sg.Text("No MP3 playlists:", size=(25, 1), justification="right"), sg.Checkbox(text="Skip creating MP3 playlist files?", default=args.noplaylists, key='-NOPLAYLISTS-')],
+        [sg.Text("Add session Number:", size=(25, 1), justification="right"), sg.Checkbox(text="Order sessions by adding number prefix?", default=not args.nonumbers, key='-NONUMBERS-')],
+        [sg.Text('_'  * 150, size=(80, 1))],
+        [sg.Text('Other Settings', font=('Helvetica', 16))],
+        [sg.Text("Delete Cached Talks:", size=(25, 1), justification="right"), sg.Checkbox(text="Speed up future downloads by keeping cache of talks?", default=args.nocleanup, key='-NOCLEANUP-')],
+        [sg.Button('Start Download', key='-BEGIN-', size=(20,3), focus=True), sg.Exit(size=(10,3)), sg.Button('Delete Talks Cache', visible=has_cache, key='-DELETE-', size=(10,3))]
+    ]
+    window = sg.Window('General Conference Downloader', layout, finalize=True)
+    while True:
+        event, values = window.read()
+        window['-DELETE-'].update(visible=os.path.exists(f'{args.cache_home}/{args.lang}'))
+        if event == sg.WIN_CLOSED or event == 'Exit':
+            window.close()
+            sys.exit(0)
+        elif event == '-DELETE-':
+            remove_cached_files(args)
+            window['-DELETE-'].update(visible=False)
+        elif event == '-BEGIN-':
+            args.lang = [k for k, v in args.lang_map.items() if values['-LANG-'].startswith(v)][0]
+            args.start = int(values['-START-'])
+            args.end = int(values['-END-'])
+            if args.start > args.end:
+                args.start, args.end = args.end, args.start
+            args.dest = window['-DEST-'].TKStringVar.get()
+            args.nocleanup = values['-NOCLEANUP-']
+            args.nonumbers = not values['-NONUMBERS-']
+            args.noplaylists = values['-NOPLAYLISTS-']
+            args.speaker_min = int(values['-SPEAKER-MIN-'])
+            break
+    window.close()
+    return args
 
 
 def remove_cached_files(args):
@@ -545,54 +603,6 @@ def write_mp3_to_disk(data, filename):
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, "wb") as f:
         f.write(data)
-
-
-def gui_get_settings(args):
-    lang_list = ["{} ({})".format(v, k) for k, v in args.lang_map.items()]
-    lang_list_idx = "{} ({})".format(args.lang_map[args.lang], args.lang)
-    year_list = range(1971, args.max_year+1)
-    has_cache = os.path.exists(f'{args.cache_home}/{args.lang}')
-    layout = [
-        [sg.Text('_'  * 150, size=(80, 1))],
-        [sg.Text('General Conference Selection', font=('Helvetica', 16))],
-        [sg.Text("Language:", size=(25, 1), justification="right"), sg.OptionMenu(values=lang_list, default_value=lang_list_idx, key='-LANG-', size=(50,1))],
-        [sg.Text("Starting year:", size=(25, 1), justification="right"), sg.OptionMenu(values=year_list, default_value=args.start, key='-START-', size=(50,1))],
-        [sg.Text("Ending year:", size=(25, 1), justification="right"), sg.OptionMenu(values=year_list, default_value=args.end, key='-END-', size=(50,1))],
-        [sg.Text('_'  * 150, size=(80, 1))],
-        [sg.Text('Downloader Output Settings', font=('Helvetica', 16))],
-        [sg.Text("Destination path:", size=(25, 1), justification="right"), sg.FolderBrowse(initial_folder=args.dest, target='-DEST-', size=(10,1)), sg.Text(args.dest, key='-DEST-', size=(40, 1))],
-        [sg.Text("Minimum talks for speaker playlist:", size=(25, 1), justification="right"), sg.OptionMenu(values=range(1,10), default_value=args.speaker_min, key='-SPEAKER-MIN-', size=(50,1))],
-        [sg.Text("No MP3 playlists:", size=(25, 1), justification="right"), sg.Checkbox(text="Skip creating MP3 playlist files?", default=args.noplaylists, key='-NOPLAYLISTS-')],
-        [sg.Text("Add session Number:", size=(25, 1), justification="right"), sg.Checkbox(text="Order sessions by adding number prefix?", default=not args.nonumbers, key='-NONUMBERS-')],
-        [sg.Text('_'  * 150, size=(80, 1))],
-        [sg.Text('Other Settings', font=('Helvetica', 16))],
-        [sg.Text("Delete Cached Talks:", size=(25, 1), justification="right"), sg.Checkbox(text="Speed up future downloads by keeping cache of talks?", default=args.nocleanup, key='-NOCLEANUP-')],
-        [sg.Button('Start Download', key='-BEGIN-', size=(20,3), focus=True), sg.Exit(size=(10,3)), sg.Button('Delete Talks Cache', visible=has_cache, key='-DELETE-', size=(10,3))]
-    ]
-    window = sg.Window('General Conference Downloader', layout, finalize=True)
-    while True:
-        event, values = window.read()
-        window['-DELETE-'].update(visible=os.path.exists(f'{args.cache_home}/{args.lang}'))
-        if event == sg.WIN_CLOSED or event == 'Exit':
-            window.close()
-            sys.exit(0)
-        elif event == '-DELETE-':
-            remove_cached_files(args)
-            window['-DELETE-'].update(visible=False)
-        elif event == '-BEGIN-':
-            args.lang = [k for k, v in args.lang_map.items() if values['-LANG-'].startswith(v)][0]
-            args.start = int(values['-START-'])
-            args.end = int(values['-END-'])
-            if args.start > args.end:
-                args.start, args.end = args.end, args.start
-            args.dest = window['-DEST-'].TKStringVar.get()
-            args.nocleanup = values['-NOCLEANUP-']
-            args.nonumbers = not values['-NONUMBERS-']
-            args.noplaylists = values['-NOPLAYLISTS-']
-            args.speaker_min = int(values['-SPEAKER-MIN-'])
-            break
-    window.close()
-    return args
 
 
 if __name__ == '__main__':
