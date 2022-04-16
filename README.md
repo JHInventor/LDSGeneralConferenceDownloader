@@ -8,7 +8,7 @@ This script is ideal for:
  - *Anyone* who wishes to study from the conference talks but doesn't have a reliable internet connection.
   
 ## What it can do?
-This script will allow you to download the LDS General Conference talks in mp3 form that are available at https://www.churchofjesuschrist.org/general-conference.
+This script will allow you to download the LDS General Conference talks in mp3 form that are available at https://www.churchofjesuschrist.org/study/general-conference.
 It will create *playlists* as *.m3u files to allow you to play an *entire session*. 
 It will also create playlists for *speakers* and *topics*.
 This will not only work with the default English versions, but also for *every other language* for which audio files are available.

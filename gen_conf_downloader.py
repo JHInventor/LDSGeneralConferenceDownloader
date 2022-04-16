@@ -3,6 +3,7 @@ Script to download LDS General Conference MP3s, creating playlists for each conf
 """
 
 import argparse
+import base64
 import datetime
 import glob
 import io
@@ -35,8 +36,8 @@ Topic = namedtuple('Topic', 'link topic')
 TalkByTopic = namedtuple('TalkByTopic', 'link speaker title topic')
 
 LDS_ORG_URL = 'https://www.churchofjesuschrist.org'
-ALL_CONFERENCES_URL = f'{LDS_ORG_URL}/general-conference/conferences'
-ALL_TOPICS_URL = f'{LDS_ORG_URL}/general-conference/topics'
+ALL_CONFERENCES_URL = f'{LDS_ORG_URL}/study/general-conference'
+ALL_TOPICS_URL = f'{LDS_ORG_URL}/study/general-conference/topics'
 
 GET_LANGS_REGEX = 'data-lang=\".*?\" data-clang=\"(.*?)\">(.*?)</a>'
 CONFERENCES_REGEX = '<a[^>]*href="([^"]*)"[^>]*><div[^>]*><img[^>]*></div><span[^>]*>([A-Z][a-z]* \d{4})</span></a>'
@@ -44,8 +45,11 @@ CONFERENCE_GROUPS_REGEX = '<a[^>]*href="([^"]*)"[^>]*><div[^>]*><img[^>]*></div>
 CONFERENCE_GROUPS_RANGE_REGEX = '.*/(\d{4})(\d{4})\?lang=.*'
 CONFERENCE_LINK_YEAR_MONTH_REGEX = '.*(\d{4})/(\d{2})\?lang=.*'
 
+SCRIPT_BASE64_REGEX = '<script>window.__INITIAL_STATE__[^"]*"([^"]*)";</script>'
 MP3_DOWNLOAD_REGEX = '<a[^>]*href="([^"]*)"[^>]*>This Page \(MP3\).*?</a>'
-MP3_FILENAME_REGEX = '.*/(.*\.mp3)\?lang=.*'
+MP3_DOWNLOAD_FILENAME_REGEX = '.*/(.*\.mp3)\?lang=.*'
+MP3_MEDIAURL_REGEX = '{"mediaUrl":"([^"]*)","variant":"audio"}'
+MP3_MEDIAURL_FILENAME_REGEX = '.*/(.*\.mp3)'
 
 SESSIONS_REGEX = '<a[^>]*href="([^"]*)"[^>]*><div[^>]*><p><span[^>]*>([^<]*)</span></p></div></a><ul[^>]*>(.*?)</ul>'
 SESSION_TALKS_REGEX = '<a[^>]*href="([^"]*)"[^>]*><div[^>]*><p><span[^>]*>([^<]*)</span></p><p[^>]*>([^<]*)</p></div></a>'
@@ -302,10 +306,23 @@ def get_all_talks_by_topic(args):
 def get_audio(args, talk):
     link_html = get_html(args, f'{LDS_ORG_URL}{decode(talk.link)}')
     mp3_link = re.search(MP3_DOWNLOAD_REGEX, link_html)
-    if not mp3_link:
+    # In April 2022 the MP3 link became buried in base64 encoded script section
+    match = re.search(SCRIPT_BASE64_REGEX, link_html)
+    if mp3_link:
+        # Extract and reuse the filename from the MP3 URL (exclude language)
+        mp3_file = re.match(MP3_DOWNLOAD_FILENAME_REGEX, mp3_link.group(1))
+    elif not mp3_link and not match:
         return
+    elif not mp3_link and match:
+        # MP3 link is probably in the base64 encoded script section
+        script_data = str(base64.b64decode(match.group(1)))
+        # Search for JSON object containing mediaUrl key and value
+        mp3_link = re.search(MP3_MEDIAURL_REGEX, script_data)
+        if not mp3_link:
+            return
+        # Extract and reuse the filename from the MP3 URL
+        mp3_file = re.match(MP3_MEDIAURL_FILENAME_REGEX, mp3_link.group(1))
 
-    mp3_file = re.match(MP3_FILENAME_REGEX, mp3_link.group(1))
     if not mp3_file:
         return
 
