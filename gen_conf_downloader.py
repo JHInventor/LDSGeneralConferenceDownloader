@@ -640,7 +640,7 @@ if __name__ == '__main__':
                         default=3)
     parser.add_argument('-start', type=int,
                         help='First year to download. Note: not all historic sessions are available in all languages',
-                        default=max_year - 5)
+                        default=min_year)
     parser.add_argument('-end', type=int,
                         help='Last year to download (defaults to present year).',
                         default=max_year)
