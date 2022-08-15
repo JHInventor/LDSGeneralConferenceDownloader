@@ -13,10 +13,8 @@ import pathlib
 import re
 import shutil
 import sys
-import threading
 
 import colorama
-from collections import defaultdict
 from collections import namedtuple
 import html as html_tools
 from html.parser import HTMLParser
