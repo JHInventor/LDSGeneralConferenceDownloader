@@ -18,7 +18,11 @@ import colorama
 from collections import namedtuple
 import html as html_tools
 from html.parser import HTMLParser
-import PySimpleGUI as sg
+CLI_ONLY = False
+try:
+    import PySimpleGUI as sg
+except ImportError:
+    CLI_ONLY = True
 from tqdm import tqdm
 from urllib.parse import unquote_plus
 from urllib.parse import quote_plus
@@ -665,7 +669,7 @@ if __name__ == '__main__':
     args.cache_home = cache_home
     validate_args(args)
 
-    if len(sys.argv) > 1 and args.nogui:
+    if CLI_ONLY or (len(sys.argv) > 1 and args.nogui):
         # Initialize colorama
         colorama.init()
 
