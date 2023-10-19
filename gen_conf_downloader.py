@@ -28,7 +28,9 @@ from urllib.parse import unquote_plus
 from urllib.parse import quote_plus
 import urllib.request
 import zlib
+
 from mutagen.mp3 import MP3
+from mutagen.easyid3 import EasyID3
 
 Conference = namedtuple('Conference', 'link title year month')
 Session = namedtuple('Session', 'conference link title number')
@@ -56,8 +58,8 @@ MP3_MEDIAURL_FILENAME_REGEX = '.*/(.*\.mp3)'
 SESSIONS_REGEX = '<a[^>]*href="([^"]*)"[^>]*><div[^>]*><p><span[^>]*>([^<]*)</span></p></div></a><ul[^>]*>(.*?)</ul>'
 SESSION_TALKS_REGEX = '<a[^>]*href="([^"]*)"[^>]*><div[^>]*><p><span[^>]*>([^<]*)</span></p><p[^>]*>([^<]*)</p></div></a>'
 
-TOPICS_REGEX = '<a[^>]*href=([^"]*)><div[^>]*><div[^>]*><div[^>]*><h4[^>]*>([^<]*)</h4></div></div></div><hr[^>]*></a>'
-TOPIC_TALKS_REGEX = '<a[^>]*href=([^"]*)><div[^>]*><div[^>]*><div[^>]*><h6[^>]*>[^<]*</h6><h6[^>]*>([^<]*)</h6></div><div[^>]*><h4[^>]*>([^<]*)</h4></div></div>.*?</a>'
+TOPICS_REGEX = '<a[^>]*href="([^"]*)"[^>]*><div[^>]*><div[^>]*><div[^>]*><h4[^>]*>([^<]*)</h4></div></div></div><hr[^>]*></a>'
+TOPIC_TALKS_REGEX = '<a href="([^"]*)"[^>]*><div[^>]*><div[^>]*><div[^>]*><div[^>]*><h6[^>]*>[^>]*><h6[^>]*>([^<]*)</h6></div></div><div[^>]*><h4[^>]*>([^<]*)</h4>'
 
 
 class DummyTqdm:
@@ -169,12 +171,14 @@ def create_playlists(args, all_talks):
         year_path = get_year_path(args, talk.session.conference)
         month_path = get_month_path(args, talk.session.conference)
         session_path = get_session_path(args, talk.session, nonumbers=True)
-        playlists.setdefault(f'Conferences/{year_path}', [])
-        playlists.setdefault(f'Conferences/{year_path}-{month_path}', [])
-        playlists.setdefault(f'Conferences/{year_path}-{month_path}-{session_path}', [])
-        playlists.setdefault(f'Speakers/{talk.speaker}', [])
+        playlists.setdefault(f'Conferences/GC-All', [])
+        # playlists.setdefault(f'Conferences/{year_path}', [])
+        # playlists.setdefault(f'Conferences/{year_path}-{month_path}', [])
+        # playlists.setdefault(f'Conferences/{year_path}-{month_path}-{session_path}', [])
+        last_name = talk.speaker.split(' ')[-1]
+        playlists.setdefault(f'Speakers/GC-S-{talk.speaker}', [])
         for topic in talk.topics:
-            playlists.setdefault(f'Topics/{topic}', [])
+            playlists.setdefault(f'Topics/GC-T-{topic}', [])
     return playlists
 
 
@@ -199,9 +203,32 @@ def download_all_content(args):
         for talk in all_talks:
             progress_bar.set_description_str(talk.title, refresh=True)
             audio = get_audio(args, talk)
-            if audio and download_audio(progress_bar, args, get_relative_path(args, talk.session), audio):
-                if not args.noplaylists:
-                    update_playlists(args, playlists, talk, audio)
+            
+            if audio:
+                # JH broke out file_path:
+                relpath = get_relative_path(args, talk.session)
+                file_path = f'{get_output_dir(args)}/{relpath}/{audio.file}'
+                
+                if download_audio(progress_bar, args, file_path, audio):
+                    
+                    # JH additional ID3 modifications to fix albums:          
+                    mp3_file = MP3(file_path, ID3=EasyID3)
+                    talk_year = talk.session.conference.year
+                    talk_month = talk.session.conference.month
+                    relevant_years = 5
+                    if talk_year < args.max_year - relevant_years:
+                        mp3_file['album'] = f'GC {args.max_year - relevant_years}-{args.min_year}'
+                    else:
+                        mp3_file['album'] = f'GC {talk.session.conference.year}-{talk.session.conference.month:02d}'
+                    mp3_file['albumartist'] = 'The Church of Jesus Christ of Latter-day Saints'
+                    mp3_file['organization'] = 'The Church of Jesus Christ of Latter-day Saints'
+                    mp3_file['composer'] = 'The Church of Jesus Christ of Latter-day Saints'
+                    mp3_file['title'] = talk.title
+                    mp3_file.save()
+                    # print(mp3_file)
+
+                    if not args.noplaylists:
+                        update_playlists(args, playlists, talk, audio)
             progress_bar.update(1)
             if hasattr(progress_bar, 'running') and not progress_bar.running:
                 break
@@ -215,9 +242,11 @@ def download_all_content(args):
         remove_cached_files(args)
 
 
-def download_audio(progress_bar, args, relpath, audio):
+def download_audio(progress_bar, args, file_path, audio):
+    #changed relpath to file_path
+
     # If audio file doesn't yet exist, attempt to retrieve it
-    file_path = f'{get_output_dir(args)}/{relpath}/{audio.file}'
+    # file_path = f'{get_output_dir(args)}/{relpath}/{audio.file}'
     if not os.path.isfile(file_path):
         try:
             req = urllib.request.Request(audio.link)
@@ -274,7 +303,11 @@ def get_all_talks(args):
                     title = clean_title(talk_info[1])
                     speaker = talk_info[2]
                     topics = [tbt.topic for tbt in all_talks_by_topic if tbt.title == title and tbt.speaker == speaker]
-                    all_talks.append(Talk(session, talk_info[0], title, speaker, topics))
+
+                    # If talk title says this is sustaining or church audit report, skip it
+                    if (-1 == title.find("Sustaining of")) and (not title.startswith("Church Auditing")):
+                        all_talks.append(Talk(session, talk_info[0], title, speaker, topics))
+
                     if hasattr(progress_bar, 'running') and not progress_bar.running:
                         break
                 if hasattr(progress_bar, 'running') and not progress_bar.running:
@@ -542,20 +575,21 @@ def update_playlists(args, playlists, talk, audio):
     duration = MP3(f'{get_output_dir(args)}/{relative_path}/{audio.file}').info.length
 
     # Add this talk to the year, conference, or session playlists
-    playlists[f'Conferences/{year_path}'].append({'duration' : duration, 'path' : f'../{relative_path}/{audio.file}', 'title' : talk.title})
-    playlists[f'Conferences/{year_path}-{month_path}'].append({'duration' : duration, 'path' : f'../{relative_path}/{audio.file}', 'title' : talk.title})
-    playlists[f'Conferences/{year_path}-{month_path}-{session_path}'].append({'duration' : duration, 'path' : f'../{relative_path}/{audio.file}', 'title' : talk.title})
+    playlists[f'Conferences/GC-All'].append({'duration' : duration, 'path' : f'../{relative_path}/{audio.file}', 'title' : talk.title, 'year': talk.session.conference.year})
+    # playlists[f'Conferences/{year_path}'].append({'duration' : duration, 'path' : f'../{relative_path}/{audio.file}', 'title' : talk.title})
+    # playlists[f'Conferences/{year_path}-{month_path}'].append({'duration' : duration, 'path' : f'../{relative_path}/{audio.file}', 'title' : talk.title})
+    # playlists[f'Conferences/{year_path}-{month_path}-{session_path}'].append({'duration' : duration, 'path' : f'../{relative_path}/{audio.file}', 'title' : talk.title})
 
     # Add this talk to each topic playlist
     for topic in talk.topics:
         # Always do newest talks to oldest for topic playlists
-        playlists[f'Topics/{topic}'].insert(0, {'duration' : duration, 'path' : f'../{relative_path}/{audio.file}', 'title' : talk.title})
+        playlists[f'Topics/GC-T-{topic}'].insert(0, {'duration' : duration, 'path' : f'../{relative_path}/{audio.file}', 'title' : talk.title, 'year': talk.session.conference.year})
 
     # If talk title says this is sustaining or church audit report, skip it for this speaker
     if -1 != talk.title.find("Sustaining of") or talk.title.startswith("Church Auditing"):
         return
     # Always do newest talks to oldest for speaker playlists
-    playlists[f'Speakers/{talk.speaker}'].insert(0, {'duration' : duration, 'path' : f'../{relative_path}/{audio.file}', 'title' : talk.title, 'year': talk.session.conference.year})
+    playlists[f'Speakers/GC-S-{talk.speaker}'].insert(0, {'duration' : duration, 'path' : f'../{relative_path}/{audio.file}', 'title' : talk.title, 'year': talk.session.conference.year})
 
 
 def validate_args(args):
